@@ -356,8 +356,13 @@ typedef short int WXTYPE;
         #define HAVE_TR1_TYPE_TRAITS
     #endif
 #endif
+#if defined(__MINGW32__)
+    #if defined(HAVE_TR1_TYPE_TRAITS)
+        #undef HAVE_TR1_TYPE_TRAITS
+    #endif
+#endif
 
-#if defined(__has_include)
+#if defined(__has_include) && !defined(__MINGW32__)
     /*
         Notice that we trust our configure tests more than __has_include(),
         notably the latter can return true even if the header exists but isn't

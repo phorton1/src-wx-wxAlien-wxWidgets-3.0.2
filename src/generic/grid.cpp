@@ -6125,7 +6125,7 @@ void wxGrid::DrawTextRectangle(wxDC& dc,
                 break;
         }
 
-        if ( textOrientation == wxHORIZONTAL )
+        if ( textOrientation != wxVERTICAL )
         {
             dc.DrawText( line, x, y );
             y += lineHeight;

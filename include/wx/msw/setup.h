@@ -435,7 +435,7 @@
 // Default is 1
 //
 // Recommended setting: 1 (but may be safely disabled if you don't use it)
-#define wxUSE_FSVOLUME      1
+#define wxUSE_FSVOLUME      0
 
 // Use wxStandardPaths class which allows to retrieve some standard locations
 // in the file system
@@ -577,7 +577,7 @@
 #define wxUSE_FS_ARCHIVE    1
 
 // Set to 1 to enable virtual Internet filesystem (requires wxUSE_FILESYSTEM)
-#define wxUSE_FS_INET       1
+#define wxUSE_FS_INET       0
 
 // wxArchive classes for accessing archives such as zip and tar
 #define wxUSE_ARCHIVE_STREAMS     1
@@ -623,8 +623,8 @@
 
 // The settings for the individual URL schemes
 #define wxUSE_PROTOCOL_FILE 1
-#define wxUSE_PROTOCOL_FTP 1
-#define wxUSE_PROTOCOL_HTTP 1
+#define wxUSE_PROTOCOL_FTP 0
+#define wxUSE_PROTOCOL_HTTP 0
 
 // Define this to use wxURL class.
 #define wxUSE_URL 1
@@ -777,7 +777,7 @@
 #   else
         // MSVC 6 didn't include GDI+ headers so disable by default, enable it
         // here if you use MSVC 6 with a newer SDK
-#       define wxUSE_GRAPHICS_CONTEXT 0
+#       define wxUSE_GRAPHICS_CONTEXT 1
 #   endif
 #else
     // Disable support for other Windows compilers, enable it if your compiler
@@ -785,7 +785,7 @@
     //
     // Notice that this will be set by configure under non-Windows platforms
     // anyhow so the value there is not important.
-#   define wxUSE_GRAPHICS_CONTEXT 0
+#   define wxUSE_GRAPHICS_CONTEXT 1
 #endif
 
 // Enable wxGraphicsContext implementation using Cairo library.
@@ -1474,7 +1474,7 @@
 #define wxUSE_PCX           1
 
 // Set to 1 for IFF format support (Amiga format)
-#define wxUSE_IFF           0
+#define wxUSE_IFF           1
 
 // Set to 1 for XPM format support
 #define wxUSE_XPM           1
