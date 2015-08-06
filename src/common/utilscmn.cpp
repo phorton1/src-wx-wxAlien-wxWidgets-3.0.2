@@ -1599,4 +1599,23 @@ bool wxYieldIfNeeded()
     return wxTheApp && wxTheApp->Yield(true);
 }
 
+
+// PRH_CHANGES - could not figure out how to add a cpp file to wxWidgets
+// thru the many layers of make, bake, shake, and configure, files, esp.
+// from alien, so here is the stupid routine.
+
+void prh_display(int dbg, int level, const wxString &string)
+{
+    wxWindow *win = wxTopLevelWindows.GetFirst()->GetData();	// wxTheApp->GetTopWindow();
+    wxCommandEvent e(-1,-27237);
+    e.SetString(string);
+    e.SetInt(dbg);
+    e.SetExtraLong(level);
+    // e.SetClientData((void *) color);
+    win->GetEventHandler()->ProcessEvent(e);
+    if (e.GetInt() != -1)	// not awake yet
+        win->GetEventHandler()->AddPendingEvent(e);		// ProcessEvent(e);
+}
+
+
 #endif // wxUSE_GUI
