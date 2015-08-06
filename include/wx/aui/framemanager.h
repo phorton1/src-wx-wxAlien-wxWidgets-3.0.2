@@ -509,6 +509,9 @@ public:
     void RestorePane(wxAuiPaneInfo& paneInfo);
     void RestoreMaximizedPane();
 
+	bool AddPane(wxWindow* window, const wxAuiPaneInfo& pane_info, const wxRect &rect);
+        // prh benign add'l AddPane() method signature for wxAuiNotebook::LoadPerspective()
+
 public:
 
     virtual wxAuiFloatingFrame* CreateFloatingFrame(wxWindow* parent, const wxAuiPaneInfo& p);

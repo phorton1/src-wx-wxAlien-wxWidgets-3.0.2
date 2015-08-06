@@ -352,6 +352,11 @@ public:
     virtual bool InsertPage(size_t index, wxWindow *page, const wxString &text,
                             bool select, int imageId);
 
+    wxString SavePerspective();
+    bool LoadPerspective(const wxString& perspective);
+    void LoadTabFrame(wxString &tabframe_info,wxAuiTabCtrl *src_tabs);
+        // prh changes
+
 protected:
     // Common part of all ctors.
     void Init();

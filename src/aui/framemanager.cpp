@@ -989,6 +989,56 @@ void wxAuiManager::SetArtProvider(wxAuiDockArt* art_provider)
 }
 
 
+
+// PRH_CHANGES - Addl implementation AddPane for wxAuiNotebook::LoadPerspective()
+
+#include <wx/prh_debug.h>
+
+extern const char *prh_direction_str(int dir);
+    // in auibook.cpp
+
+bool wxAuiManager::AddPane(wxWindow* window, const wxAuiPaneInfo& pane_info, const wxRect &rect)
+    // required for my wxPerl builds
+    // window and rect are overloaded
+    // window==NULL => clear out the dock array, unused otherwise
+    // rect width or height == dock.size; unused otherwise
+{
+    if (window == NULL)
+    {
+        m_docks.Clear();
+        prh_dbg(dbg_sld,1,"wxAuiManager::AddPane1() - CLEARING ALL DOCKS");
+        return true;
+    }
+
+    prh_dbg3(dbg_sld,2,"wxAuiManager::AddPane1() - ADDING DOCK dir=%s layer=%d row=%d",
+        prh_direction_str(pane_info.dock_direction),
+        pane_info.dock_layer,
+        pane_info.dock_row);
+
+    wxAuiDockInfo dock;
+    dock.dock_direction = pane_info.dock_direction;
+    dock.dock_layer = pane_info.dock_layer;
+    dock.dock_row = pane_info.dock_row;
+
+    if (pane_info.dock_direction==wxAUI_DOCK_LEFT ||
+        pane_info.dock_direction==wxAUI_DOCK_RIGHT)
+    {
+        dock.size = rect.width + 2;
+    }
+    else
+    {
+        dock.size = rect.height + 1;
+    }
+
+    prh_dbg1(dbg_sld,3,"dock.size=%d",dock.size);
+
+    m_docks.Add(dock);
+    return AddPane(window, pane_info);
+}
+
+// END PRH_CHANGES
+
+
 bool wxAuiManager::AddPane(wxWindow* window, const wxAuiPaneInfo& paneInfo)
 {
     wxASSERT_MSG(window, wxT("NULL window ptrs are not allowed"));
@@ -2848,6 +2898,51 @@ bool wxAuiManager::ProcessDockResult(wxAuiPaneInfo& target,
 
     if (allowed)
     {
+
+    #ifdef UNUSED_PRH_CHANGES
+        // prh modification for wxToolbars in my application
+        // orientation according to the new layout. May not
+        // be needed anymore, cuz I no longer have toolbars
+        // in my programs.  Code kept for posterities sake.
+
+        wxWindow *w = target.window;
+        if (w->IsKindOf(CLASSINFO(wxToolBar)))
+        {
+            wxToolBar *tb = (wxToolBar *) w;
+            int flag = tb->GetWindowStyleFlag();
+            bool old_vert = (flag & wxTB_VERTICAL) ? true : false;
+            bool new_vert = false;
+            if ((target.dock_direction==wxAUI_DOCK_LEFT) ||
+                (target.dock_direction==wxAUI_DOCK_RIGHT))
+                new_vert = true;
+
+            if (new_vert != old_vert)
+            {
+                flag ^= wxTB_VERTICAL | wxTB_HORIZONTAL;
+                flag |= (new_vert ? wxTB_VERTICAL : wxTB_HORIZONTAL);
+                tb->SetWindowStyleFlag(flag);
+                tb->Realize();
+                wxSize sz = tb->GetBestSize();
+
+                // add some padding for long dimension
+
+                if (new_vert) sz.y += 5; else sz.x += 5;
+                target.BestSize(sz);
+
+                // and some y for the floating
+
+                sz.y += 22;
+                sz.x += 12 + (new_vert ? 4 : 0);
+                target.FloatingSize(sz);
+
+                // not needed Update();
+
+                target.dock_direction = new_pos.dock_direction;
+                return allowed;
+            }
+        }
+    #endif /* UNUSED_PRH_CHANGES */
+
         target = new_pos;
         // Should this RTTI and function call be rewritten as
         // sending a new event type to allow other window types
@@ -2904,6 +2999,29 @@ bool wxAuiManager::DoDrop(wxAuiDockInfoArray& docks,
     if (drop.IsToolbar())
         layer_insert_offset = 0;
 
+#ifdef UNUSED_PRH_CHANGES
+	// questionable prh modification to eliminate annoying dock
+	// of non-toolbars when mouse is outside of client area.
+	// pt is in client coordinates, so top/left toolbar dock
+	// locations are negative and right/bottom are > cli_rect.
+	// Using some "fuzzy" constants worked well enough for me.
+
+	wxRect cli_rect = m_frame->GetClientRect();
+	if (0)
+	{
+		wxString dbg_text;
+		dbg_text.Printf(wxT("pt=%d,%d  rect=%d,%d,%d,%d"),
+			pt.x,pt.y,cli_rect.x,cli_rect.y,cli_rect.width,cli_rect.height);
+		m_frame->SetLabel(dbg_text);
+	}
+	cli_rect.x -= 28;
+	cli_rect.y -= 28;
+	cli_rect.width += 56;
+	cli_rect.height += 56;
+	if (!cli_rect.Contains(pt))
+		return false;
+
+#endif  /* UNUSED_PRH_CHANGES */
 
     if (pt.x < layer_insert_offset &&
         pt.x > layer_insert_offset-auiLayerInsertPixels &&

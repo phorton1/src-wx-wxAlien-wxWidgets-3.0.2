@@ -2516,6 +2516,59 @@ void wxAuiNotebook::OnTabBeginDrag(wxAuiNotebookEvent&)
     m_lastDragX = 0;
 }
 
+
+// PRH_CHANGES - improve docking and implement my floating frames
+
+#include <wx/prh_debug.h>
+
+wxAuiNotebook *prhBestChild(wxAuiNotebook *self, wxWindow **child)
+    // Child begins as wxFindWindowAtPoint(pt).
+    // Given some arbitrary window in child, return
+    // return the notebook, if any, associated with it,
+    // and if one found, the 'best' child for dropping
+    // which will be a child of the notebook and either
+    // a tab control, or a client managed page owned by
+    // the notebook.
+{
+    wxWindow *bk = *child;
+    wxWindow *win = *child;
+
+    while (bk && !bk->IsKindOf(CLASSINFO(wxAuiNotebook)))
+        bk = bk->GetParent();
+
+    // let moves within the book take place normally
+
+    wxAuiNotebook *book = (wxAuiNotebook *) bk;
+    if (book == self)
+    {
+        prh_dbg(dbg_ddd,1,"prhBestChild returning NULL (book==self)");
+        return NULL;
+    }
+
+    // find the child window at mouse point
+
+    if (book && !win->IsKindOf(CLASSINFO(wxAuiTabCtrl)))
+    {
+        void *w = win->GetHandle();
+        for (unsigned int i=0; i<book->GetPageCount(); i++)
+        {
+            wxWindow *page = book->GetPage(i);
+            void *hw = page->GetHandle();
+            if (hw == w)
+            {
+                *child = page;
+            }
+        }
+    }
+
+    prh_dbg1(dbg_ddd,1,"prhBestChild returning book=%s",(book?book->GetLabel():"NULL"));
+    return book;
+}
+
+// END PRH_CHANGES
+
+
+
 void wxAuiNotebook::OnTabDragMotion(wxAuiNotebookEvent& evt)
 {
     wxPoint screen_pt = ::wxGetMousePosition();
@@ -2580,9 +2633,30 @@ void wxAuiNotebook::OnTabDragMotion(wxAuiNotebookEvent& evt)
     {
         wxWindow* tab_ctrl = ::wxFindWindowAtPoint(screen_pt);
 
+
+        // PRH_CHANGES - getBestChild() logic
+        // starting with tab_ctrl, get the best child
+        // for the hint preferably highlight it, and return
+        // also added HideHint() call and brackets just below
+        wxAuiNotebook *book = prhBestChild(this,&tab_ctrl); // ,screen_pt);
+        if (book)
+        {
+            wxWindow *use_win = (tab_ctrl) ? tab_ctrl : book;
+            wxRect rect = use_win->GetScreenRect();
+            m_mgr.ShowHint(rect);
+            prh_dbg(dbg_dd,0,"wxAuiNotebook::OnTabDragMotion() returning best child");
+            return;
+        }
+        // END PRH_CHANGES
+
         // if we aren't over any window, stop here
         if (!tab_ctrl)
+        {
+            // PRH_CHANGES - added call to HideHint()
+            m_mgr.HideHint();
+            // END PRH_CHANGES
             return;
+        }
 
         // make sure we are not over the hint window
         if (!wxDynamicCast(tab_ctrl, wxFrame))
@@ -2749,6 +2823,10 @@ void wxAuiNotebook::OnTabEndDrag(wxAuiNotebookEvent& evt)
                 dest_tabs->InsertPage(page_info.window, page_info, insert_idx);
                 nb->m_tabs.InsertPage(page_info.window, page_info, insert_idx);
 
+                // PRH_CHANGES - make tabs on brand new notebooks show correctly
+                nb->UpdateTabCtrlHeight();
+                // END PRH_CHANGES
+
                 nb->DoSizing();
                 dest_tabs->DoShowHide();
                 dest_tabs->Refresh();
@@ -2761,6 +2839,12 @@ void wxAuiNotebook::OnTabEndDrag(wxAuiNotebookEvent& evt)
                 e2.SetSelection(evt.GetSelection());
                 e2.SetOldSelection(evt.GetSelection());
                 e2.SetEventObject(this);
+
+                // PRH_CHANGES - overload setDragSource for move to other notebook
+                // so client can update titles
+                e2.SetDragSource(nb);
+                // END PRH_CHANGES
+
                 GetEventHandler()->ProcessEvent(e2);
 
                 return;
@@ -2768,8 +2852,24 @@ void wxAuiNotebook::OnTabEndDrag(wxAuiNotebookEvent& evt)
         }
     }
 
-
-
+    // PRH_CHANGES - moved block of code
+    // out of following if statement so that it would be invariantly executed
+    wxPoint zero(0,0);
+    wxRect rect = m_mgr.CalculateHintRect(m_dummyWnd,mouse_client_pt,zero);
+    if (rect.IsEmpty())
+    {
+        // inner modification (orig just returned)
+        // generate a drag_done over empty space
+        // so client code can create a floating frame
+        wxWindow *page = src_tabs->GetPage(evt.GetSelection()).window;
+        wxAuiNotebookEvent e(wxEVT_COMMAND_AUINOTEBOOK_DRAG_DONE, m_windowId);
+        e.SetSelection(-1);		// over empty space
+        e.SetOldSelection(evt.GetSelection());
+        e.SetEventObject(page);
+        GetEventHandler()->ProcessEvent(e);
+        return;
+    }
+    // END PRH_CHANGES
 
     // only perform a tab split if it's allowed
     wxAuiTabCtrl* dest_tabs = NULL;
@@ -2798,15 +2898,7 @@ void wxAuiNotebook::OnTabEndDrag(wxAuiNotebookEvent& evt)
         }
         else
         {
-            wxPoint zero(0,0);
-            wxRect rect = m_mgr.CalculateHintRect(m_dummyWnd,
-                                                  mouse_client_pt,
-                                                  zero);
-            if (rect.IsEmpty())
-            {
-                // there is no suitable drop location here, exit out
-                return;
-            }
+            // PRH_CHANGES - moved code block was here
 
             // If there is no tabframe at all, create one
             wxTabFrame* new_tabs = new wxTabFrame;
@@ -3325,6 +3417,315 @@ int wxAuiNotebook::ChangeSelection(size_t n)
 {
     return DoModifySelection(n, false);
 }
+
+
+
+// PRH_CHANGES - implementation of SavePerspective and LoadPerspective
+
+void prh_dbg_rect(int dbg, int level, const char *s, const wxRect &rect)
+{
+    prh_dbg5(dbg,level,"%s %d,%d,%d,%d",s,rect.x,rect.y,rect.width,rect.height);
+}
+
+const char *prh_direction_str(int dir)
+{
+    switch (dir)
+    {
+        case wxAUI_DOCK_NONE     : return "0=DOCK_NONE";
+        case wxAUI_DOCK_TOP      : return "1=DOCK_TOP";
+        case wxAUI_DOCK_RIGHT    : return "2=DOCK_RIGHT";
+        case wxAUI_DOCK_BOTTOM   : return "3=DOCK_BOTTOM";
+        case wxAUI_DOCK_LEFT     : return "4=DOCK_LEFT";
+        case wxAUI_DOCK_CENTER   : return "5=DOCK_CENTER";
+    }
+    return "unknown DOCK_DIRECTION";
+}
+
+
+wxString &PullPart(wxString &rslt, wxString &layout)
+{
+    rslt = layout.BeforeFirst(wxT(','));
+    if (rslt.Length() == 0)
+    {
+        rslt = layout;
+        layout = wxT("");
+    }
+    else
+    {
+        layout = layout.AfterFirst(wxT(','));
+    }
+    return rslt;
+}
+
+
+void wxAuiNotebook::LoadTabFrame(wxString &tabframe_info, wxAuiTabCtrl *src_tabs)
+    // Add a new tabframe from the streamed data.
+    // Functionality mostly gleaned from Split();
+    // Has to work with partially populated src_tabs;
+{
+    // pull off the pane values
+
+    wxString mt;
+    int direction = wxAtoi(PullPart(mt,tabframe_info).c_str());
+    int layer = wxAtoi(PullPart(mt,tabframe_info).c_str());
+    int row = wxAtoi(PullPart(mt,tabframe_info).c_str());
+    int pos = wxAtoi(PullPart(mt,tabframe_info).c_str());
+    int proportion = wxAtoi(PullPart(mt,tabframe_info).c_str());
+
+    int x = wxAtoi(PullPart(mt,tabframe_info).c_str());
+    int y = wxAtoi(PullPart(mt,tabframe_info).c_str());
+    int w = wxAtoi(PullPart(mt,tabframe_info).c_str());
+    int h = wxAtoi(PullPart(mt,tabframe_info).c_str());
+    wxRect rect(x,y,w,h);
+
+    prh_dbg(dbg_sld,1,"prh LoadTabFrame()");
+    prh_dbg2(dbg_sld,2,"dir=%s layer=%d",prh_direction_str(direction),layer);
+    prh_dbg3(dbg_sld,2,"row=%d pos=%d proportion=%d",row,pos,proportion);
+    prh_dbg_rect(dbg_sld,2,"rect",rect);
+
+    // create the auiPaneInfo
+
+    wxAuiPaneInfo pane_info = wxAuiPaneInfo().Bottom().CaptionVisible(false);
+    pane_info.Layer(layer);
+    pane_info.Row(row);
+    pane_info.Position(pos);
+    if (direction == wxAUI_DOCK_LEFT)
+        pane_info.Left();
+    else if (direction == wxAUI_DOCK_RIGHT)
+        pane_info.Right();
+    else if (direction == wxAUI_DOCK_TOP)
+        pane_info.Top();
+    else if (direction == wxAUI_DOCK_BOTTOM)
+        pane_info.Bottom();
+    else
+        pane_info.Center();
+
+    // the proportion is important to sizing
+
+    pane_info.dock_proportion = proportion;
+    pane_info.rect = rect;
+
+    // create a new tabframe and tabctrl
+
+    wxTabFrame* new_tabs = new wxTabFrame;
+    new_tabs->m_rect = rect;
+    new_tabs->SetTabCtrlHeight(m_tabCtrlHeight);
+    new_tabs->m_tabs = new wxAuiTabCtrl(
+        this,
+        m_tabIdCounter++,
+        rect.GetTopLeft(),          // wxDefaultPosition,
+        rect.GetSize(),             // wxDefaultSize,
+        wxNO_BORDER|wxWANTS_CHARS);
+    wxAuiTabCtrl *dest_tabs = new_tabs->m_tabs;
+    dest_tabs->SetArtProvider(m_tabs.GetArtProvider()->Clone());
+    dest_tabs->SetFlags(m_flags);
+
+    // add it to the notebook's manager
+    // uses my AddPane() method to re-add the docks with rect size
+
+    pane_info.window = new_tabs;
+    m_mgr.AddPane(new_tabs, pane_info, rect);
+    m_mgr.Update();
+
+    // grab the pages from src_tabs
+    // and add them to the new tabframe
+
+    wxWindow *active_window = NULL;
+    while (tabframe_info.Length() > 0)
+    {
+        wxString win_info;
+        PullPart(win_info,tabframe_info);
+        prh_dbg1(dbg_sld,2,"adding page(%s)",win_info);
+
+        // pull off the active page asterisk if present
+
+        bool is_active_page = false;
+        if (win_info.Left(1) == wxT("*"))
+        {
+            is_active_page = true;
+            win_info = win_info.AfterFirst(wxT('*'));
+        }
+
+        // get the src_idx of the tab with this window id
+        // must continue loop to parse string even if not found
+
+        long window_id;
+        win_info.ToLong(&window_id);
+            // returns true if parses whole string
+            // returns integer portion in any case
+
+        int src_idx = -1;
+        size_t i, page_count = src_tabs->GetPageCount();
+        for (i = 0; i < page_count; ++i)
+        {
+            wxAuiNotebookPage& page = src_tabs->GetPage(i);
+            prh_dbg2(dbg_sld,3,"look for window_id=%d - checking %d",window_id,page.window->GetId());
+            if (page.window->GetId() == window_id)
+            {
+                src_idx = i;
+                i = page_count;
+            }
+        }
+        if (src_idx == -1)
+        {
+            prh_dbg1(dbg_sld,0,"Error: could not find window_id(%d) in src_tabs",window_id);
+            continue;
+        }
+
+        // remove the page from the source tabs
+        // and add the page to the destination tabs
+
+        int dest_idx = dest_tabs->GetPageCount();
+        wxAuiNotebookPage page_info = src_tabs->GetPage(src_idx);
+        src_tabs->RemovePage(page_info.window);
+        dest_tabs->InsertPage(page_info.window, page_info, dest_idx);
+
+        // size it and display it
+        // We need to call SetSelection() at least once for the
+        // tabframe to get the tabs to draw correctly.
+        // We call it on every pane just in case the src_tabs
+        // is only partially populated and the active tab is not showing.
+
+        DoSizing();
+        dest_tabs->DoShowHide();
+        dest_tabs->Refresh();
+        if (is_active_page)
+            active_window = page_info.window;
+        SetSelection(m_tabs.GetIdxFromWindow(page_info.window));
+        UpdateHintWindowSize();
+    }
+
+    // After all done, if we added the actual active window, make it active
+
+    if (active_window != NULL)
+        SetSelection(m_tabs.GetIdxFromWindow(active_window));
+
+}   // wxAuiNotebook::LoadTabFrame()
+
+
+bool wxAuiNotebook::LoadPerspective(const wxString& layout)
+// Hopefully tilde not used and colon already a delimiter
+{
+    wxString my_layout = layout;
+    prh_dbg(dbg_sl,0,"wxAuiNotebook::LoadPerspective called");
+    prh_dbg1(dbg_sld,1,"layout=%s",layout);
+
+    // The 1st pane from m_mgr is the src_tabs (0==the dummy window).
+    // Detatch it (the default tab_ctrl) from m_mgr.
+    // Have to watch out for cases where src_tabs are missing
+
+    wxAuiPaneInfoArray& all_panes = m_mgr.GetAllPanes();
+    size_t pane_count = all_panes.GetCount();
+    wxAuiPaneInfo &info = all_panes.Item(pane_count-1);
+    wxTabFrame *tab_frame = (wxTabFrame *) info.window;
+    if (tab_frame == NULL) return true;
+    wxAuiTabCtrl *src_tabs = tab_frame->m_tabs;
+    if (src_tabs == NULL) return true;
+    m_mgr.DetachPane(info.window);
+
+    // we have to pre-delete the old_tab frame
+    // while keeping it's src_tabs around for working purposes
+    // else the 0th frame gets confused and does not set the
+    // first two tabs as active for some reason
+
+    tab_frame->m_tabs = NULL;
+    if (!wxPendingDelete.Member(src_tabs))
+        wxPendingDelete.Append(src_tabs);
+    delete tab_frame;
+
+    // sheesh call AddPane with null to clear all existing docks
+
+    wxRect stupid;
+    m_mgr.AddPane(NULL, info, stupid);
+
+    // Create a new set of tabframes from the streamed data
+
+    int frame_num = 0;
+    while (my_layout.Left(8) == wxT("tabframe"))
+    {
+        frame_num++;
+        prh_dbg1(dbg_sld,1,"frame(%d)",frame_num);
+        wxString tabframe_info = my_layout.BeforeFirst(wxT(';'));
+        my_layout = my_layout.AfterFirst(';');
+        tabframe_info = tabframe_info.AfterFirst(wxT('='));
+        LoadTabFrame(tabframe_info,src_tabs);
+    }
+
+    // below required to set the 1st new frame as the center frame
+
+    RemoveEmptyTabFrames();
+
+    // update and return to caller
+
+    m_mgr.Update();
+    return true;
+}
+
+
+wxString wxAuiNotebook::SavePerspective()
+    // The wxAuiNotebook has a wxAuiManager of it's own which contains
+    // a single pane named "dummy", and a number of other panes which are
+    // wxTabFrames. A split is indicated by 3 or more panes (cuz of 'dummy').
+    // We don't need to do anything if there is no split, so we just return.
+    // Otherwise, we save off each tabframe's info along with the labels of
+    // the pages in the tabframe, so that we can rebuild it all later.
+{
+    wxString result;
+    prh_dbg(dbg_sl,0,"wxAuiNotebook::SavePerspective called");
+    wxAuiPaneInfoArray& all_panes = m_mgr.GetAllPanes();
+    size_t i, pane_count = all_panes.GetCount();
+
+    // append each tabframe's info
+
+    for (i=0; i<pane_count; i++)
+    {
+        if (all_panes.Item(i).name == wxT("dummy"))
+            continue;
+
+        wxAuiPaneInfo &info = all_panes.Item(i);
+        wxTabFrame* tabframe = (wxTabFrame*)info.window;
+
+        result += wxT("tabframe=");
+        result += wxString::Format(wxT("%d,%d,%d,%d,%d,%d,%d,%d,%d"),
+            info.dock_direction,
+            info.dock_layer,
+            info.dock_row,
+            info.dock_pos,
+            info.dock_proportion,
+            tabframe->m_rect.x,
+            tabframe->m_rect.y,
+            tabframe->m_rect.width,
+            tabframe->m_rect.height	);
+
+        prh_dbg3(dbg_sld,1,"frame(%d) dir=%d layer=%d",i,info.dock_direction,info.dock_layer);
+        prh_dbg3(dbg_sld,2,"row=%d pos=%d proportion=%d",info.dock_row,info.dock_pos,info.dock_proportion);
+        prh_dbg_rect(dbg_sld,2,"tabframe rect",tabframe->m_rect);
+
+        // mark the active page with an asterisk
+
+        wxAuiNotebookPageArray& pages = tabframe->m_tabs->GetPages();
+        size_t j, page_count = pages.GetCount();
+        for (j=0; j<page_count; j++)
+        {
+            wxAuiNotebookPage& page = pages.Item(j);
+            result += wxT(",");
+            if (page.active) result += wxT("*");
+            result << page.window->GetId();         // page.caption;
+            prh_dbg1(dbg_sld,1,"writing window_id(%d)",page.window->GetId()); // caption.c_str());
+            prh_dbg2(dbg_sld,2,"window::NAME=%s  LABEL=%s",
+                page.window->GetName(),
+                page.window->GetLabel());
+        }
+
+        result += wxT(';');
+    }
+
+    return result;
+}
+
+// END PRH_CHANGES
+
+
 
 bool wxAuiNotebook::AddPage(wxWindow *page, const wxString &text, bool select, 
                             int imageId)
