@@ -171,6 +171,12 @@ void UndoHistory::AppendAction(actionType at, int position, char *data, int leng
 		savePoint = -1;
 	}
 	int oldCurrentAction = currentAction;
+
+	// prh - minor modifications below to not coalesce single
+	// char inserts/deletions, yet keep coalescing higher level
+	// commands like "tab" a selection.
+	// if (0) disables all coalescing
+
 	if (currentAction >= 1) {
 		if (0 == undoSequenceDepth) {
 			// Top level actions may not always be coalesced
@@ -194,16 +200,19 @@ void UndoHistory::AppendAction(actionType at, int position, char *data, int leng
 				;	// A coalescible containerAction
 			} else if ((at != actPrevious->at) && (actPrevious->at != startAction)) {
 				currentAction++;
-			} else if ((at == insertAction) &&
-			           (position != (actPrevious->position + actPrevious->lenData))) {
-				// Insertions must be immediately after to coalesce
+			} else if (at == insertAction) {
+				// prh - was 'if ((at == insertAction) &&
+			    // (position != (actPrevious->position + actPrevious->lenData))) {
+				// Insertions must be immediately after to coalesce'
 				currentAction++;
 			} else if (at == removeAction) {
 				if ((lengthData == 1) || (lengthData == 2)) {
 					if ((position + lengthData) == actPrevious->position) {
-						; // Backspace -> OK
+						// prh - was '; // Backspace -> OK'
+						currentAction++;
 					} else if (position == actPrevious->position) {
-						; // Delete -> OK
+						// prh - was '; // Delete -> OK'
+						currentAction++;
 					} else {
 						// Removals must be at same position to coalesce
 						currentAction++;
