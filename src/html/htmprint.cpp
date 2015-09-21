@@ -714,6 +714,13 @@ bool wxHtmlEasyPrinting::DoPreview(wxHtmlPrintout *printout1, wxHtmlPrintout *pr
 bool wxHtmlEasyPrinting::DoPrint(wxHtmlPrintout *printout)
 {
     wxPrintDialogData printDialogData(*GetPrintData());
+
+    // prh modification to pass a funky constant
+    // down to dialog window so that default printer is
+    // setup correctly if "SetDefaultInfo(1)" called from perl
+    bool def_printer = m_PageSetupData->GetDefaultInfo();
+    if (def_printer) printDialogData.SetNoCopies(11237);
+
     wxPrinter printer(&printDialogData);
 
     if (!printer.Print(m_ParentWindow, printout, true))

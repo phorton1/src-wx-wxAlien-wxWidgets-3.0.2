@@ -838,6 +838,19 @@ bool wxWindowsPrintDialog::ConvertToNative( wxPrintDialogData &data )
     pd->nCopies = (WORD)data.GetNoCopies();
 
     pd->Flags = PD_RETURNDC;
+
+    // prh addition ... use numCopies == 11237 as a
+    // weird hook to get a boolean down here from wxPerl
+    // to use default printer ... set PD_RETURNDEFAULT flag,
+    // which only works if hDevMode and hDevNames are NULL
+    if (pd->nCopies == 11237)
+    {
+        pd->Flags |= PD_RETURNDEFAULT;
+        pd->nCopies = 1;
+        pd->hDevMode = (HGLOBAL) NULL;
+        pd->hDevNames = (HGLOBAL) NULL;
+    }
+
     pd->lStructSize = sizeof( PRINTDLG );
 
     pd->hwndOwner = NULL;
