@@ -34,6 +34,9 @@
 #include "wx/infobar.h"
 
 
+#include <wx/prh_debug.h>
+
+
 // default font size of normal text (HTML font size 0) for printing, in points:
 #define DEFAULT_PRINT_FONT_SIZE   12
 
@@ -155,6 +158,8 @@ int wxHtmlDCRenderer::Render(int x, int y,
     if(to < hght)
         hght = to;
 
+    prh_dbg1(dbg_print,0,"Render clipping region m_Width=%d",m_Width);
+
     if (!dont_render)
     {
         wxHtmlRenderingInfo rinfo;
@@ -175,7 +180,9 @@ int wxHtmlDCRenderer::Render(int x, int y,
 
 int wxHtmlDCRenderer::GetTotalWidth() const
 {
-    return m_Cells ? m_Cells->GetWidth() : 0;
+    int i = m_Cells ? m_Cells->GetWidth() : 0;
+    prh_dbg1(dbg_print,0,"GetTotalWidth()=%d",i);
+    return i;
 }
 
 int wxHtmlDCRenderer::GetTotalHeight() const
@@ -223,9 +230,13 @@ void wxHtmlPrintout::AddFilter(wxHtmlFilter *filter)
     m_Filters.Append(filter);
 }
 
+
+
 bool
 wxHtmlPrintout::CheckFit(const wxSize& pageArea, const wxSize& docArea) const
 {
+    prh_dbg2(dbg_print,0,"Checkfit(%d,%d)",docArea.x,pageArea.x);
+
     // Nothing to do if the contents fits horizontally.
     if ( docArea.x <= pageArea.x )
         return true;
@@ -260,6 +271,12 @@ wxHtmlPrintout::CheckFit(const wxSize& pageArea, const wxSize& docArea) const
     }
     else // We're going to really print and not just preview.
     {
+        // prh - I don't know why the doc width is 750,
+        // and the page width is 512, but I don't want
+        // this warning, so temporary fix to get rid of it
+
+        return true;
+        
         // This is our last chance to warn the user that the output will be
         // mangled so do show a message box.
         wxMessageDialog

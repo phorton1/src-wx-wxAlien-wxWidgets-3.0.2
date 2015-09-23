@@ -42,6 +42,8 @@ WXDLLIMPEXP_BASE void prh_display(int dbg, int level, const wxString &string);
     // richTextBuffer/stc "undo" scheme
 #define dbg_undod 0x00020000
     // richTextBuffer/stc "undo" scheme details
+#define dbg_print 0x00040000
+    // html easy printing, etc
 
 
 #endif /* _PRH_DEBUG_H */
