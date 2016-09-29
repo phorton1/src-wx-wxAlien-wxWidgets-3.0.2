@@ -7,11 +7,25 @@
 // Copyright:   (c) Patrick Horton
 // Licence:     wxWindows licence
 /////////////////////////////////////////////////////////////////////////////
+// 2016-09-28 ... no longer passing back to wxPerl via event
+/////////////////////////////////////////////////////////////////////////////
+// Hence forth would just need to keep a list somewhere
+// of the "blah" things that I just put in the dbg calls,
+// and would not modify this file for new groups of calls.
+//
+// You can set the global debug level via PRH_WX_DEBUG environment variable.
+//    It defaults to 0
+// You can set groups of functions debug levels via environment variables
+//    PRH_WX_DEBUG_DD = 0
+// The messages go to STDOUT, formatted to look somewhat like
+//    those from appUtils::display(). They do NOT go to the
+//    appUtils logfile.
+
 
 #ifndef _PRH_DEBUG_H_
 #define _PRH_DEBUG_H_
 
-WXDLLIMPEXP_BASE void prh_display(int dbg, int level, const wxString &string);
+WXDLLIMPEXP_BASE void prh_display(char* dbg, int level, const wxString &string);
 #define prh_dbg(dbg,level,s)            prh_display(dbg,level,s)
 #define prh_dbg1(dbg,level,s,a)         prh_display(dbg,level,wxString::Format(s,a))
 #define prh_dbg2(dbg,level,s,a,b)       prh_display(dbg,level,wxString::Format(s,a,b))
@@ -20,29 +34,34 @@ WXDLLIMPEXP_BASE void prh_display(int dbg, int level, const wxString &string);
 #define prh_dbg5(dbg,level,s,a,b,c,d,e) prh_display(dbg,level,wxString::Format(s,a,b,c,d,e))
 
 
-// debugging constants
+// Known debugging constants
+//
+// Set PRH_WX_DEBUG = 0       global debugging level or
+// Set PRH_WX_DEBUG_DD = 2    dbg_dd debug level (default = 5)
+//
+// probably want to figure out backtrace and stack indentation
 
-#define dbg_dd  0x10000000
+#define dbg_dd  "DD"
     // drag and drop debugging flag
-#define dbg_ddd 0x20000000
+#define dbg_ddd "DDD"
     // drag and drop details flag
-#define dbg_sl  0x01000000
+#define dbg_sl  "SL"
     // save/load perspective
-#define dbg_sld 0x02000000
+#define dbg_sld "SLD"
     // save/load perspective details
-#define dbg_rs 0x00100000
+#define dbg_rs "_RS"
     // richTextBuffer styling
-#define dbg_rsd 0x00200000
+#define dbg_rsd "_RSD"
     // richTextBuffer details
-#define dbg_rsdd 0x00400000
+#define dbg_rsdd "_RSDD"
     // richTextBuffer gruesome details
-#define dbg_rsp  0x00800000
+#define dbg_rsp  "_RSP"
     // debug paragraph pasting
-#define dbg_undo  0x00010000
+#define dbg_undo  "_UNDO"
     // richTextBuffer/stc "undo" scheme
-#define dbg_undod 0x00020000
+#define dbg_undod "_UNDOD"
     // richTextBuffer/stc "undo" scheme details
-#define dbg_print 0x00040000
+#define dbg_print "PRINT"
     // html easy printing, etc
 
 

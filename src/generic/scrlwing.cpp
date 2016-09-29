@@ -1010,6 +1010,15 @@ void wxScrollHelperBase::HandleOnMouseWheel(wxMouseEvent& event)
 {
     m_wheelRotation += event.GetWheelRotation();
     int lines = m_wheelRotation / event.GetWheelDelta();
+    
+    // prh - stop it if ctrl pressed
+    // to implement zoom by ctrl wheel in my windows
+    if (event.ControlDown())
+    {
+        lines = 0;
+    }
+    
+    
     m_wheelRotation -= lines * event.GetWheelDelta();
 
     if (lines != 0)

@@ -1604,8 +1604,74 @@ bool wxYieldIfNeeded()
 // thru the many layers of make, bake, shake, and configure, files, esp.
 // from alien, so here is the stupid routine.
 
-void prh_display(int dbg, int level, const wxString &string)
+
+int prhGetEnvInt(char *var, int value)
 {
+    char *strval = getenv(var);
+    if (strval != NULL)
+    {
+        value = atoi(strval);
+    }
+    return value;
+}
+
+
+
+/* Obtain a backtrace and print it to stdout.
+ *
+ * #include <execinfo.h>
+
+    void
+    print_trace (void)
+    {
+      void *array[10];
+      size_t size;
+      char **strings;
+      size_t i;
+    
+      size = backtrace (array, 10);
+      strings = backtrace_symbols (array, size);
+    
+      printf ("Obtained %zd stack frames.\n", size);
+    
+      for (i = 0; i < size; i++)
+         printf ("%s\n", strings[i]);
+    
+      free (strings);
+    }
+*/
+
+
+void prh_display(char *dbg, int level, const wxString &string)
+    // dbg defaults to 5 so 5 turns everything on by default
+{
+    // print_trace();
+    
+    int prh_debug_level = prhGetEnvInt("PRH_WX_DEBUG",0);
+    
+    char dbg_str[255];
+    strcpy(dbg_str,"PRH_WX_DEBUG");
+    strcat(dbg_str,dbg);
+    int dbg_level = prhGetEnvInt(dbg_str,5);
+    
+    char indent[255];
+    strcpy(indent,"    ");
+    int ctr = level;
+    while (ctr-- > 0)
+    {
+        strcat(indent,"    ");
+    }
+    
+    
+    printf("====== WX_DEBUG(%s,%d) [%d,%d] ====== %s %s\r\n",
+        dbg,
+        level,
+        prh_debug_level,
+        dbg_level,
+        indent,
+        string.mb_str().data());
+
+    /*
     wxWindow *win = wxTopLevelWindows.GetFirst()->GetData();	// wxTheApp->GetTopWindow();
     wxCommandEvent e(-1,-27237);
     e.SetString(string);
@@ -1615,6 +1681,7 @@ void prh_display(int dbg, int level, const wxString &string)
     win->GetEventHandler()->ProcessEvent(e);
     if (e.GetInt() != -1)	// not awake yet
         win->GetEventHandler()->AddPendingEvent(e);		// ProcessEvent(e);
+    */
 }
 
 

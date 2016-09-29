@@ -3422,7 +3422,7 @@ int wxAuiNotebook::ChangeSelection(size_t n)
 
 // PRH_CHANGES - implementation of SavePerspective and LoadPerspective
 
-void prh_dbg_rect(int dbg, int level, const char *s, const wxRect &rect)
+void prh_dbg_rect(char *dbg, int level, const char *s, const wxRect &rect)
 {
     prh_dbg5(dbg,level,"%s %d,%d,%d,%d",s,rect.x,rect.y,rect.width,rect.height);
 }
